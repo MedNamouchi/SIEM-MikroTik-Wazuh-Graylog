@@ -1,0 +1,94 @@
+<!--
+  ================================================================
+  Wazuh Custom Decoders — MikroTik via Graylog
+  ================================================================
+  These decoders parse MikroTik logs forwarded by Graylog in
+  "full" format through the rsyslog localhost channel.
+
+  Log format example:
+  Apr 30 08:45:07 ubuntu22 unknown source: 172.30.2.38 |
+  message: CHR: [10, High] { msg: MKT[001][SYS]: login failure
+  for user admin from 172.30.3.71 via winbox | device_vendor: MikroTik }
+
+  Prefix format: MKT[ROUTER_ID][LOG_TYPE]
+    - ROUTER_ID : 001 to 006 (unique per router)
+    - LOG_TYPE  : FW (firewall) | SYS (system) | INFO (info)
+
+  File location (Wazuh Manager):
+  /var/ossec/etc/decoders/local_decoder.xml
+  ================================================================
+-->
+
+<!-- ============================================================
+     PARENT DECODER
+     Matches any log coming from a MikroTik router via Graylog.
+     All child decoders inherit from this one.
+     ============================================================ -->
+<decoder name="mikrotik_graylog">
+  <prematch>msg: MKT[</prematch>
+  <type>syslog</type>
+</decoder>
+
+<!-- ============================================================
+     AUTHENTICATION FAILURE
+     Triggered when a login attempt fails on any router.
+     Extracts: router_id, log_type, action, user, source IP,
+               and access method (winbox, ssh, telnet, web)
+     ============================================================ -->
+<decoder name="mikrotik_graylog_auth_failure">
+  <parent>mikrotik_graylog</parent>
+  <use_own_name>true</use_own_name>
+  <prematch>login failure</prematch>
+  <regex type="pcre2">msg: MKT\[(\d+)\]\[([A-Z]+)\]: (login failure) for user (\S+) from (\S+) via (\S+)</regex>
+  <order>router_id, log_type, act, user, srcip, access_method</order>
+</decoder>
+
+<!-- ============================================================
+     AUTHENTICATION SUCCESS
+     Triggered when a user successfully logs in to any router.
+     Extracts: router_id, log_type, user, action, source IP,
+               and access method
+     ============================================================ -->
+<decoder name="mikrotik_graylog_auth_login">
+  <parent>mikrotik_graylog</parent>
+  <use_own_name>true</use_own_name>
+  <prematch>logged in</prematch>
+  <regex type="pcre2">msg: MKT\[(\d+)\]\[([A-Z]+)\]: user (\S+) (logged in) from (\S+) via (\S+)</regex>
+  <order>router_id, log_type, user, act, srcip, access_method</order>
+</decoder>
+
+<!-- ============================================================
+     LOGOUT
+     Triggered when a user logs out from any router.
+     ============================================================ -->
+<decoder name="mikrotik_graylog_auth_logout">
+  <parent>mikrotik_graylog</parent>
+  <use_own_name>true</use_own_name>
+  <prematch>logged out</prematch>
+  <regex type="pcre2">msg: MKT\[(\d+)\]\[([A-Z]+)\]: user (\S+) (logged out) from (\S+) via (\S+)</regex>
+  <order>router_id, log_type, user, act, srcip, access_method</order>
+</decoder>
+
+<!-- ============================================================
+     FIREWALL — PACKET DROPPED
+     Triggered when the firewall drops a packet.
+     ============================================================ -->
+<decoder name="mikrotik_graylog_fw_drop">
+  <parent>mikrotik_graylog</parent>
+  <use_own_name>true</use_own_name>
+  <prematch>dropped</prematch>
+  <regex type="pcre2">msg: MKT\[(\d+)\]\[([A-Z]+)\]: .*?src-address=([\d.]+).*?dst-address=([\d.]+).*?protocol=(\S+)</regex>
+  <order>router_id, log_type, srcip, dstip, protocol</order>
+</decoder>
+
+<!-- ============================================================
+     SYSTEM — REBOOT / CONFIG CHANGE
+     Triggered on system-level events (reboot, config changes).
+     ============================================================ -->
+<decoder name="mikrotik_graylog_system">
+  <parent>mikrotik_graylog</parent>
+  <use_own_name>true</use_own_name>
+  <prematch>reboot|config|added|removed</prematch>
+  <regex type="pcre2">msg: MKT\[(\d+)\]\[([A-Z]+)\]: (.*)</regex>
+  <order>router_id, log_type, extra_data</order>
+</decoder>
