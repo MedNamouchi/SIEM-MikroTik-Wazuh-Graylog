@@ -1,0 +1,123 @@
+<!--
+  ================================================================
+  Wazuh Custom Rules — MikroTik via Graylog
+  ================================================================
+  These rules generate structured alerts based on the decoded
+  fields from mikrotik-decoder.xml.
+
+  Rule ID range: 110010 - 110020 (custom range, no conflict)
+
+  Severity levels:
+    3  = informational
+    5  = low
+    8  = medium
+    10 = high
+    12 = critical (brute force)
+
+  File location (Wazuh Manager):
+  /var/ossec/etc/rules/local_rules.xml
+  ================================================================
+-->
+
+<group name="mikrotik,">
+
+  <!-- ============================================================
+       RULE 110010 — Parent rule
+       Matches any log decoded by mikrotik_graylog parent decoder.
+       All child rules inherit from this one.
+       ============================================================ -->
+  <rule id="110010" level="0">
+    <decoded_as>mikrotik_graylog</decoded_as>
+    <description>MikroTik: Log received via Graylog pipeline</description>
+    <group>mikrotik,</group>
+  </rule>
+
+  <!-- ============================================================
+       RULE 110011 — Authentication success
+       Triggered on successful login to any router.
+       Level 3: informational — normal expected event.
+       ============================================================ -->
+  <rule id="110011" level="3">
+    <if_sid>110010</if_sid>
+    <decoded_as>mikrotik_graylog_auth_login</decoded_as>
+    <description>MikroTik: User $(user) logged in to router MKT[$(router_id)] from $(srcip) via $(access_method)</description>
+    <group>authentication_success,</group>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+  </rule>
+
+  <!-- ============================================================
+       RULE 110012 — Authentication failure
+       Triggered on a single failed login attempt.
+       Level 5: low — single failure is not critical.
+       ============================================================ -->
+  <rule id="110012" level="5">
+    <if_sid>110010</if_sid>
+    <decoded_as>mikrotik_graylog_auth_failure</decoded_as>
+    <description>MikroTik: Login failure for user $(user) on router MKT[$(router_id)] from $(srcip) via $(access_method)</description>
+    <group>authentication_failed,</group>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <!-- ============================================================
+       RULE 110013 — Logout
+       Triggered when a user logs out from any router.
+       Level 3: informational.
+       ============================================================ -->
+  <rule id="110013" level="3">
+    <if_sid>110010</if_sid>
+    <decoded_as>mikrotik_graylog_auth_logout</decoded_as>
+    <description>MikroTik: User $(user) logged out from router MKT[$(router_id)]</description>
+    <group>authentication_success,</group>
+  </rule>
+
+  <!-- ============================================================
+       RULE 110014 — Firewall packet dropped
+       Triggered when the firewall drops a packet.
+       Level 8: medium — may indicate a scan or intrusion attempt.
+       ============================================================ -->
+  <rule id="110014" level="8">
+    <if_sid>110010</if_sid>
+    <decoded_as>mikrotik_graylog_fw_drop</decoded_as>
+    <description>MikroTik: Firewall dropped packet from $(srcip) to $(dstip) on router MKT[$(router_id)]</description>
+    <group>firewall_drop,</group>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+  </rule>
+
+  <!-- ============================================================
+       RULE 110015 — BRUTE FORCE ATTACK (critical)
+       Triggered when rule 110012 fires 5+ times in 120 seconds
+       from the same source IP.
+       Level 12: critical — active response triggered.
+       ============================================================ -->
+  <rule id="110015" level="12" frequency="5" timeframe="120">
+    <if_matched_sid>110012</if_matched_sid>
+    <same_field>srcip</same_field>
+    <description>MikroTik: Possible brute force attack from $(srcip) on router MKT[$(router_id)]</description>
+    <group>authentication_failures,brute_force,</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+  </rule>
+
+  <!-- ============================================================
+       RULE 110016 — System event (reboot / config change)
+       Triggered on system-level events.
+       Level 8: medium — config changes should always be reviewed.
+       ============================================================ -->
+  <rule id="110016" level="8">
+    <if_sid>110010</if_sid>
+    <decoded_as>mikrotik_graylog_system</decoded_as>
+    <description>MikroTik: System event on router MKT[$(router_id)]: $(extra_data)</description>
+    <group>system_change,</group>
+    <mitre>
+      <id>T1562</id>
+    </mitre>
+  </rule>
+
+</group>
