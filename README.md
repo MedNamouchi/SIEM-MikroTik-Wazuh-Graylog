@@ -6,7 +6,7 @@ End-to-end SIEM deployment with MikroTik, Wazuh and Graylog — EVE-NG lab + pro
 
 ![Status](https://img.shields.io/badge/Phase%201-EVE--NG%20Lab%20%E2%9C%85-brightgreen)
 ![Status](https://img.shields.io/badge/Phase%202-Production%20🚧-orange)
-![RouterOS](https://img.shields.io/badge/RouterOS-7.18+-blue)
+![RouterOS](https://img.shields.io/badge/RouterOS-7.23+-blue)
 ![Wazuh](https://img.shields.io/badge/Wazuh-4.x-blue)
 ![Graylog](https://img.shields.io/badge/Graylog-7.0-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -157,7 +157,7 @@ SIEM-MikroTik-Wazuh-Graylog/
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| MikroTik RouterOS | **7.18+** | TLS support for CEF logging requires 7.18 minimum |
+| MikroTik RouterOS | **7.23+** | TLS support for CEF logging requires 7.23 minimum |
 | Ubuntu Server | 22.04 LTS | Hosts Graylog, rsyslog, and Wazuh Agent |
 | Graylog | 7.0 | + MongoDB (metadata) + OpenSearch (storage) |
 | Wazuh Manager | 4.x | Separate server |
