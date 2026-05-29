@@ -1,0 +1,147 @@
+<!--
+  ================================================================
+  Wazuh Custom Decoders — MikroTik Phase 2 (Production)
+  ================================================================
+  Extended decoders for physical CCR routers with real hostnames.
+
+  Key difference from Phase 1:
+  Phase 1 used numeric IDs: MKT[001], MKT[002]...
+  Phase 2 uses real router hostnames: OFIR_MAIN_NEW, etc.
+
+  This required a new flexible parent decoder
+  (mikrotik_graylog_identity) using PCRE2 to match any
+  alphanumeric router name instead of fixed numeric IDs.
+
+  File location (Wazuh Manager):
+  /var/ossec/etc/decoders/local_decoder.xml
+  ================================================================
+-->
+
+<!-- ============================================================
+     PARENT DECODER — Real router identity
+     Matches any router name in ROUTERNAME[TYPE]: format.
+     Replaces the numeric MKT[001] pattern from Phase 1.
+     ============================================================ -->
+<decoder name="mikrotik_graylog_identity">
+  <prematch>msg:</prematch>
+  <regex type="pcre2">msg:\s*([A-Z0-9\-]+)\[(FW|SYS|INFO)\]:</regex>
+  <order>router_name, log_type</order>
+  <type>syslog</type>
+</decoder>
+
+<!-- ============================================================
+     AUTHENTICATION SUCCESS
+     ============================================================ -->
+<decoder name="mikrotik-auth-success">
+  <parent>mikrotik_graylog_identity</parent>
+  <use_own_name>true</use_own_name>
+  <prematch type="pcre2">logged in from</prematch>
+  <regex type="pcre2">msg: ([A-Z0-9_\-]+)\[INFO\]: user (\S+) logged in from (\S+) via (\S+)</regex>
+  <order>router_name, user, srcip, app</order>
+</decoder>
+
+<!-- ============================================================
+     AUTHENTICATION FAILURE
+     ============================================================ -->
+<decoder name="mikrotik-auth-failure">
+  <parent>mikrotik_graylog_identity</parent>
+  <use_own_name>true</use_own_name>
+  <prematch type="pcre2">login failure</prematch>
+  <regex type="pcre2">msg: ([A-Z0-9_\-]+)\[SYS\]: login failure for user (\S+) from (\S+) via (\S+)</regex>
+  <order>router_name, dstuser, srcip, app</order>
+</decoder>
+
+<!-- ============================================================
+     LOGOUT
+     ============================================================ -->
+<decoder name="mikrotik-auth-logout">
+  <parent>mikrotik_graylog_identity</parent>
+  <use_own_name>true</use_own_name>
+  <prematch type="pcre2">logged out from</prematch>
+  <regex type="pcre2">msg: ([A-Z0-9_\-]+)\[INFO\]: user (\S+) logged out from (\S+) via (\S+)</regex>
+  <order>router_name, user, srcip, app</order>
+</decoder>
+
+<!-- ============================================================
+     REBOOT — CONSCIOUS (triggered by a user)
+     Extracts: router name, reboot method, user, source IP
+     ============================================================ -->
+<decoder name="mikrotik-reboot-conscious">
+  <parent>mikrotik_graylog_identity</parent>
+  <use_own_name>true</use_own_name>
+  <prematch type="pcre2">router rebooted by</prematch>
+  <regex type="pcre2">msg: ([A-Z0-9_\-]+)\[SYS\]: router rebooted by ([^:]+):(\S+)@([\d\.]+)</regex>
+  <order>router_name, reboot_method, user, srcip</order>
+</decoder>
+
+<!-- ============================================================
+     REBOOT — UNCONSCIOUS (unexpected, no user triggered)
+     ============================================================ -->
+<decoder name="mikrotik-reboot-unconscious">
+  <parent>mikrotik_graylog_identity</parent>
+  <use_own_name>true</use_own_name>
+  <prematch type="pcre2">router rebooted \|</prematch>
+  <regex type="pcre2">msg: ([A-Z0-9_\-]+)\[SYS\]: router rebooted</regex>
+  <order>router_name</order>
+</decoder>
+
+<!-- ============================================================
+     REBOOT — CRASH CAUSE
+     Extracts the reason for the unexpected reboot/crash
+     ============================================================ -->
+<decoder name="mikrotik-reboot-cause">
+  <parent>mikrotik_graylog_identity</parent>
+  <use_own_name>true</use_own_name>
+  <prematch type="pcre2">System rebooted because</prematch>
+  <regex type="pcre2">msg: ([A-Z0-9_\-]+)\[SYS\]: System rebooted because of ([^|]+?) \|</regex>
+  <order>router_name, extra_data</order>
+</decoder>
+
+<!-- ============================================================
+     CONFIG CHANGE
+     Extracts: router, what changed, by whom, from where
+     Note: rule 100404 suppresses automatic WireGuard scheduler
+     updates to avoid false positives
+     ============================================================ -->
+<decoder name="mikrotik-config-changed">
+  <parent>mikrotik_graylog_identity</parent>
+  <use_own_name>true</use_own_name>
+  <prematch type="pcre2">changed by</prematch>
+  <regex type="pcre2">msg: ([A-Z0-9_\-]+)\[SYS\]: (.+) changed by ([^:]+):(\S+)@([\d\.]+)[^ ]* \(([^)]+)\)</regex>
+  <order>router_name, change_type, access_method, user, srcip, extra_data</order>
+</decoder>
+
+<!-- ============================================================
+     RESOURCE MONITORING — CPU / MEMORY HIGH
+     Triggered when CPU or RAM exceeds threshold on any router
+     ============================================================ -->
+<decoder name="mikrotik-resource-high">
+  <parent>mikrotik_graylog_identity</parent>
+  <use_own_name>true</use_own_name>
+  <prematch type="pcre2">\[WARN\]: (CPU|MEMORY) HIGH</prematch>
+  <regex type="pcre2">msg: \[WARN\]: (CPU|MEMORY) HIGH: (?:cpu-load|mem-usage)=(\d+)% on router ([A-Z0-9_\-]+)</regex>
+  <order>resource_type, resource_value, router_name</order>
+</decoder>
+
+<!-- ============================================================
+     FIREWALL — PARENT
+     Matches any firewall event from any router
+     ============================================================ -->
+<decoder name="mikrotik-firewall">
+  <parent>mikrotik_graylog_identity</parent>
+  <use_own_name>true</use_own_name>
+  <prematch type="pcre2">\[FW\]:</prematch>
+  <regex type="pcre2">msg: ([A-Z0-9_\-]+)\[FW\]: ([\w\s\-]+?) (\w+): in:([\w\s\-]+?) out:([\w\s\-]+?), connection-state:(\w+) .+?, (\d+\.\d+\.\d+\.\d+):(\d+)->(\d+\.\d+\.\d+\.\d+):(\d+), len (\d+)</regex>
+  <order>router_name, rule_name, fw_direction, in_interface, out_interface, connection_state, src_ip, src_port, dst_ip, dst_port, packet_len</order>
+</decoder>
+
+<!-- ============================================================
+     FIREWALL — KEY-VALUE (CEF fields)
+     Child decoder extracting CEF metadata fields
+     ============================================================ -->
+<decoder name="mikrotik-firewall-kv">
+  <parent>mikrotik-firewall</parent>
+  <use_own_name>true</use_own_name>
+  <regex type="pcre2">device_version: ([\w\.\s\(\)]+) \|.+?device_product: ([\w\-\+]+) \|.+?dvc: (\d+\.\d+\.\d+\.\d+) \|.+?act: (\w+) \|.+?dvchost: (\S+) \|.+?severity: (\w+) \|.+?proto: (\w+) \|</regex>
+  <order>device_version, device_product, router_ip, fw_action, dvchost, severity, protocol</order>
+</decoder>
