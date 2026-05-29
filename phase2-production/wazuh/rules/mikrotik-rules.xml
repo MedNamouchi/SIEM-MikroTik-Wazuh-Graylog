@@ -1,0 +1,270 @@
+<!--
+  ================================================================
+  Wazuh Custom Rules — MikroTik Phase 2 (Production)
+  ================================================================
+  Extended rules for physical CCR routers.
+
+  What's new compared to Phase 1:
+  - Targeted brute force detection (same user, same IP)
+  - Port scan detection
+  - External inbound traffic monitoring
+  - VPN interface (WireGuard) monitoring
+  - Web server access monitoring
+  - Conscious / unconscious reboot detection
+  - Router crash cause alerting
+  - CPU and RAM high usage alerting
+  - Config change suppression for scheduler (WireGuard auto-update)
+
+  Rule ID ranges:
+    100200–100207 : Firewall
+    100300–100304 : Authentication
+    100400–100404 : System (reboot, config)
+    100500–100501 : Resource monitoring
+    110014–110016 : Brute force (Graylog pipeline)
+
+  File location (Wazuh Manager):
+  /var/ossec/etc/rules/local_rules.xml
+  ================================================================
+-->
+
+<!-- ============================================================
+     FIREWALL RULES
+     ============================================================ -->
+<group name="mikrotik,firewall,">
+
+  <!-- Parent: any firewall event -->
+  <rule id="100200" level="3">
+    <decoded_as>mikrotik-firewall</decoded_as>
+    <description>MikroTik: Firewall event on router $(router_name)</description>
+  </rule>
+
+  <!-- Allowed connection -->
+  <rule id="100201" level="4">
+    <if_sid>100200</if_sid>
+    <field name="fw_action">accept</field>
+    <description>MikroTik: Allowed connection $(src_ip):$(src_port) -> $(dst_ip):$(dst_port) | Router: $(router_name) | IN: $(in_interface) OUT: $(out_interface)</description>
+  </rule>
+
+  <!-- Blocked connection -->
+  <rule id="100202" level="8">
+    <if_sid>100200</if_sid>
+    <field name="fw_action">drop</field>
+    <description>MikroTik: Blocked connection $(src_ip):$(src_port) -> $(dst_ip):$(dst_port) | Router: $(router_name)</description>
+  </rule>
+
+  <!-- Event on main router specifically -->
+  <rule id="100203" level="5">
+    <if_sid>100200</if_sid>
+    <field name="router_name">ROUTER_NAME</field>
+    <description>MikroTik: Event on MAIN ROUTER (ROUTER_NAME): $(rule_name)</description>
+  </rule>
+
+  <!-- Access to web server 172.16.7.12 -->
+  <rule id="100204" level="7">
+    <if_sid>100200</if_sid>
+    <field name="dst_ip">172.16.7.12</field>
+    <description>MikroTik: Access to WEB SERVER from $(src_ip) | Router: $(router_name) | Interface: $(in_interface)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- Port scan: 10+ events from same IP in 30 seconds -->
+  <rule id="100205" level="10" frequency="10" timeframe="30">
+    <if_matched_sid>100200</if_matched_sid>
+    <same_source_ip/>
+    <description>MikroTik: Potential PORT SCAN detected from $(src_ip) | Router: $(router_name)</description>
+    <group>recon,port_scan,</group>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+  </rule>
+
+  <!-- External inbound traffic (non-RFC1918 source) -->
+  <rule id="100206" level="9">
+    <if_sid>100200</if_sid>
+    <field name="src_ip" type="pcre2">^(?!10\.|172\.16\.|192\.168\.)</field>
+    <description>MikroTik: External inbound traffic $(src_ip) -> $(dst_ip):$(dst_port) | Router: $(router_name) | Interface: $(in_interface)</description>
+    <group>external_traffic,</group>
+    <mitre>
+      <id>T1071</id>
+    </mitre>
+  </rule>
+
+  <!-- Traffic via VPN interface WireGuard -->
+  <rule id="100207" level="6">
+    <if_sid>100200</if_sid>
+    <field name="in_interface">VPN_INTERFACE</field>
+    <description>MikroTik: Traffic via VPN interface VPN_INTERFACE | $(src_ip) -> $(dst_ip):$(dst_port) | Router: $(router_name)</description>
+    <group>vpn,</group>
+  </rule>
+
+</group>
+
+<!-- ============================================================
+     AUTHENTICATION RULES
+     ============================================================ -->
+<group name="mikrotik,authentication,">
+
+  <!-- Suppress default Wazuh auth failure for MikroTik -->
+  <rule id="2501" level="0" overwrite="yes">
+    <if_sid>2500</if_sid>
+    <match>login failure</match>
+    <description>Suppress default auth failure for MikroTik routers</description>
+  </rule>
+
+  <!-- Login success -->
+  <rule id="100300" level="3">
+    <decoded_as>mikrotik-auth-success</decoded_as>
+    <description>MikroTik: Successful login - user $(user) from $(srcip) via $(app) on router $(router_name)</description>
+    <group>authentication_success,</group>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+  </rule>
+
+  <!-- Login failure -->
+  <rule id="100301" level="5">
+    <if_sid>2501</if_sid>
+    <decoded_as>mikrotik-auth-failure</decoded_as>
+    <description>MikroTik: Login failure - user $(dstuser) from $(srcip) via $(app) on router $(router_name)</description>
+    <group>authentication_failed,</group>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <!-- Brute force: 5+ failures from same IP in 60 seconds -->
+  <rule id="100302" level="10" frequency="5" timeframe="60">
+    <if_matched_sid>100301</if_matched_sid>
+    <same_source_ip/>
+    <description>MikroTik: Brute force attack - 5+ failures from $(srcip) on router $(router_name)</description>
+    <group>bruteforce,authentication_failures,</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Logout -->
+  <rule id="100303" level="3">
+    <decoded_as>mikrotik-auth-logout</decoded_as>
+    <description>MikroTik: User $(dstuser) logged out from $(srcip) via $(app) on router $(router_name)</description>
+    <group>authentication_success,</group>
+  </rule>
+
+  <!-- Login success after failures (suspicious) -->
+  <rule id="100304" level="8">
+    <if_matched_sid>100301</if_matched_sid>
+    <match>logged in from</match>
+    <same_source_ip/>
+    <description>MikroTik: Login success after failures from $(srcip) on router $(router_name)</description>
+    <group>authentication_success,bruteforce,</group>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <!-- Brute force via Graylog pipeline (Phase 1 rules kept) -->
+  <rule id="110014" level="8">
+    <decoded_as>mikrotik_graylog_auth_failure</decoded_as>
+    <description>MikroTik: Authentication failure for user $(user) from $(srcip)</description>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <rule id="110015" level="12" frequency="5" timeframe="120">
+    <if_matched_sid>110014</if_matched_sid>
+    <same_source_ip/>
+    <description>MikroTik: Possible brute force attack from $(srcip)</description>
+    <group>bruteforce,authentication_failures,</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Targeted brute force: same IP + same user -->
+  <rule id="110016" level="13" frequency="5" timeframe="120">
+    <if_matched_sid>110014</if_matched_sid>
+    <same_source_ip/>
+    <same_field>dstuser</same_field>
+    <description>MikroTik: Targeted brute force on user $(dstuser) from $(srcip)</description>
+    <group>bruteforce,targeted_attack,</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<!-- ============================================================
+     SYSTEM RULES (reboot, config change)
+     ============================================================ -->
+<group name="mikrotik,system,">
+
+  <!-- Conscious reboot (triggered by a user) -->
+  <rule id="100400" level="8">
+    <decoded_as>mikrotik-reboot-conscious</decoded_as>
+    <description>MikroTik: Router $(router_name) rebooted by $(user) via $(reboot_method) from $(srcip)</description>
+    <group>reboot,</group>
+    <mitre>
+      <id>T1529</id>
+    </mitre>
+  </rule>
+
+  <!-- Unexpected reboot (no user triggered) -->
+  <rule id="100401" level="12">
+    <decoded_as>mikrotik-reboot-unconscious</decoded_as>
+    <description>MikroTik: Router $(router_name) rebooted unexpectedly — no user triggered</description>
+    <group>reboot,</group>
+    <mitre>
+      <id>T1529</id>
+    </mitre>
+  </rule>
+
+  <!-- Router crash cause -->
+  <rule id="100402" level="13">
+    <decoded_as>mikrotik-reboot-cause</decoded_as>
+    <description>MikroTik: Router $(router_name) crash cause — $(extra_data)</description>
+    <group>reboot,critical,</group>
+  </rule>
+
+  <!-- Config change -->
+  <rule id="100403" level="5">
+    <decoded_as>mikrotik-config-changed</decoded_as>
+    <description>MikroTik: Config changed on $(router_name) by $(user) via $(access_method) — $(extra_data)</description>
+    <group>config_changed,</group>
+    <mitre>
+      <id>T1562</id>
+    </mitre>
+  </rule>
+
+  <!-- Suppress automatic WireGuard scheduler updates -->
+  <rule id="100404" level="0">
+    <if_sid>100403</if_sid>
+    <match>changed by scheduler</match>
+    <description>Suppress: Automatic WireGuard peer update by scheduler</description>
+  </rule>
+
+</group>
+
+<!-- ============================================================
+     RESOURCE MONITORING RULES
+     ============================================================ -->
+<group name="mikrotik,performance,">
+
+  <!-- CPU high -->
+  <rule id="100500" level="8">
+    <decoded_as>mikrotik-resource-high</decoded_as>
+    <field name="resource_type">CPU</field>
+    <description>MikroTik: CPU HIGH on router $(router_name) — $(resource_value)% usage</description>
+    <group>performance,cpu,</group>
+  </rule>
+
+  <!-- Memory high -->
+  <rule id="100501" level="8">
+    <decoded_as>mikrotik-resource-high</decoded_as>
+    <field name="resource_type">MEMORY</field>
+    <description>MikroTik: MEMORY HIGH on router $(router_name) — $(resource_value)% usage</description>
+    <group>performance,memory,</group>
+  </rule>
+
+</group>
