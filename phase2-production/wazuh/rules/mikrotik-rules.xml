@@ -59,10 +59,10 @@
     <description>MikroTik: Event on MAIN ROUTER (ROUTER_NAME): $(rule_name)</description>
   </rule>
 
-  <!-- Access to web server 172.16.7.12 -->
+  <!-- Access to web server WEB_SERVER_IP -->
   <rule id="100204" level="7">
     <if_sid>100200</if_sid>
-    <field name="dst_ip">172.16.7.12</field>
+    <field name="dst_ip">WEB_SERVER_IP</field>
     <description>MikroTik: Access to WEB SERVER from $(src_ip) | Router: $(router_name) | Interface: $(in_interface)</description>
     <mitre>
       <id>T1190</id>

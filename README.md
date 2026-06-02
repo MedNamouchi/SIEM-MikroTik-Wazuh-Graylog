@@ -169,7 +169,7 @@ parent decoder `mikrotik_graylog_identity` with a flexible PCRE2 regex.
 | `100205` | 10 | Port scan (10+ events from same IP in 30s) |
 | `100206` | 9 | External inbound traffic (non-RFC1918 source) |
 | `100207` | 6 | Traffic via VPN interface `VPN_INTERFACE` |
-| `100204` | 7 | Access to web server `172.16.7.12` |
+| `100204` | 7 | Access to web server `WEB_SERVER_IP` |
 | `100400` | 8 | Conscious reboot |
 | `100401` | 12 | Unexpected reboot |
 | `100402` | 13 | Router crash cause |

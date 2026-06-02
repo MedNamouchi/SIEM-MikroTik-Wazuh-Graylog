@@ -171,7 +171,7 @@ Subject: [WAZUH] CONFIG CHANGE MikroTik - Level 5 - Router ROUTER_NAME - User ad
 
 Router        : ROUTER_NAME
 User          : admin
-Source IP     : 10.10.10.5
+Source IP     : ROUTER_IP
 Access Method : winbox
 Change        : ip/firewall/filter
 ```
