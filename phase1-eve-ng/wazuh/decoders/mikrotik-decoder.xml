@@ -6,7 +6,7 @@
   "full" format through the rsyslog localhost channel.
 
   Log format example:
-  Apr 30 08:45:07 ubuntu22 unknown source: 172.30.2.38 |
+  Apr 30 08:45:07 ubuntu22 unknown source: ROUTER_IP |
   message: CHR: [10, High] { msg: MKT[001][SYS]: login failure
   for user admin from ADMIN_IP via winbox | device_vendor: MikroTik }
 
