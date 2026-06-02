@@ -8,7 +8,7 @@
   Log format example:
   Apr 30 08:45:07 ubuntu22 unknown source: 172.30.2.38 |
   message: CHR: [10, High] { msg: MKT[001][SYS]: login failure
-  for user admin from 172.30.3.71 via winbox | device_vendor: MikroTik }
+  for user admin from ADMIN_IP via winbox | device_vendor: MikroTik }
 
   Prefix format: MKT[ROUTER_ID][LOG_TYPE]
     - ROUTER_ID : 001 to 006 (unique per router)
