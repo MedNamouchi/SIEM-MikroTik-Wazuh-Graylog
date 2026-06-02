@@ -4,6 +4,7 @@
 
 ![Phase 1](https://img.shields.io/badge/Phase%201-EVE--NG%20Lab%20✅-brightgreen)
 ![Phase 2](https://img.shields.io/badge/Phase%202-Production%20✅-brightgreen)
+![Phase 3](https://img.shields.io/badge/Phase%203-Optimisation%20%F0%9F%9A%A7-orange)
 ![RouterOS](https://img.shields.io/badge/RouterOS-7.23+-blue)
 ![Wazuh](https://img.shields.io/badge/Wazuh-4.x-blue)
 ![Graylog](https://img.shields.io/badge/Graylog-7.0-orange)
@@ -17,15 +18,15 @@ This project documents a **production-grade SIEM pipeline** that collects securi
 
 Built during a cybersecurity internship at **OFIR LTD — Osijek, Croatia (April–August 2026)**.
 
-| | Phase 1 | Phase 2 |
-|---|---|---|
-| **Environment** | EVE-NG (virtual) | Production (physical) |
-| **Routers** | 6x MikroTik CHR | Physical CCR routers |
-| **Router identity** | Numeric IDs `MKT[001]` | Real names `ROUTER_NAME` |
-| **Decoders** | Auth + Firewall + System | + Reboot + Config + Resources + Firewall detailed |
-| **Rules** | Brute force + System | + Port scan + VPN + External traffic + CPU/RAM |
-| **Status** | ✅ Complete | ✅ Complete |
-
+| | Phase 1 | Phase 2 | Phase 3 |
+|---|---|---|---|
+| **Environment** | EVE-NG (virtual) | Production (physical) | Production (physical) |
+| **Routers** | 6x MikroTik CHR | Physical CCR routers | Physical CCR routers |
+| **Router identity** | Numeric IDs `MKT[001]` | Real names `ROUTER_NAME` | Real names `ROUTER_NAME` |
+| **Decoders** | Auth + Firewall + System | + Reboot + Config + Resources + Firewall detailed | Same + FIM + SCA |
+| **Rules** | Brute force + System | + Port scan + VPN + External traffic + CPU/RAM | + MITRE mapping + Compliance tags |
+| **Focus** | Lab simulation | Production pipeline | Optimisation & hardening |
+| **Status** | ✅ Complete | ✅ Complete | 🚧 In Progress |
 ---
 
 ## 🏗️ Architecture
@@ -176,6 +177,7 @@ parent decoder `mikrotik_graylog_identity` with a flexible PCRE2 regex.
 | `100501` | 8 | MEMORY HIGH |
 
 ---
+
 
 ## 🔑 Key Technical Discoveries
 
