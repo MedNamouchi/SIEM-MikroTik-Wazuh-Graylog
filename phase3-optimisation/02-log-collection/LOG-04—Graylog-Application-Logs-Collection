@@ -1,0 +1,87 @@
+# LOG-04 — Graylog Application Logs Collection
+
+> **Task:** Collect Graylog application logs  
+> **Author:** Mohamed Amine Namouchi  
+> **Date:** June 5, 2026  
+> **Status:** ✅ Complete
+
+---
+
+## Context
+
+Graylog application logs contain critical information about the
+health of the log pipeline itself:
+
+```
+→ Index optimization events
+→ System job execution
+→ Stream processing errors
+→ Input failures (if MikroTik stops sending)
+→ Pipeline errors
+→ Authentication to Graylog web UI
+```
+
+Without collecting these logs, a Graylog failure would be invisible
+to Wazuh — the pipeline could stop silently.
+
+---
+
+## Log File
+
+| Field | Value |
+|-------|-------|
+| **Path** | `/var/log/graylog-server/server.log` |
+| **Format** | Custom Graylog format (timestamp + level + component + message) |
+| **Agent** | graylog (agent 001) |
+| **Retention** | 6 months |
+
+---
+
+## Sample Log Entry
+
+```
+2026-06-04T14:37:23.774+02:00 INFO  [OptimizeIndexJob] Optimizing index <graylog_1>.
+2026-06-04T14:37:26.595+02:00 INFO  [MongoIndexRangeService] Calculated range of [graylog_1] in [2821ms].
+2026-06-04T14:37:26.599+02:00 INFO  [CreateNewSingleIndexRangeJob] Created ranges for index graylog_1.
+```
+
+---
+
+## Configuration
+
+Added to `/var/ossec/etc/ossec.conf` on the Graylog server:
+
+```xml
+<!-- Graylog application logs — Phase 3 LOG-04 -->
+<localfile>
+  <log_format>syslog</log_format>
+  <location>/var/log/graylog-server/server.log</location>
+</localfile>
+```
+
+---
+
+## Validation
+
+Confirmed working on 2026-06-05:
+
+```
+2026/06/05 10:38:06 wazuh-logcollector: INFO: (1950):
+Analyzing file: '/var/log/graylog-server/server.log'. ✅
+```
+
+---
+
+## Detection Value
+
+| Event | Security Value |
+|-------|---------------|
+| `ERROR` in server.log | Pipeline failure — investigate immediately |
+| `WARN` repeated | Degraded performance — monitor |
+| Input stopped | MikroTik logs no longer arriving |
+| Auth failure to UI | Unauthorized access attempt to Graylog |
+
+---
+
+*Document maintained as part of Phase 3 — Optimisation & Hardening*  
+*Last updated: June 2026*
