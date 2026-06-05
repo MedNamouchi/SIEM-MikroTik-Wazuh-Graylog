@@ -132,6 +132,18 @@ It serves as the reference for:
 | **Note** | Active SSH scanning detected from external IPs |
 
 ---
+### Source 8 — Graylog Application Logs
+
+| Field | Value |
+|-------|-------|
+| **Source** | Graylog application — server.log |
+| **Owner** | Mohamed Amine Namouchi / Domagoj Muhar |
+| **Collection Method** | Wazuh Agent reads local file |
+| **Format** | syslog |
+| **File Path** | `/var/log/graylog-server/server.log` |
+| **Agent** | graylog (agent 001) |
+| **Retention** | 6 months |
+| **Detection Value** | 🟠 High — pipeline failures, input errors, auth to Graylog UI |
 
 ## Pipeline Overview
 
